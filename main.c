@@ -47,7 +47,9 @@ int main(int argc, char ** argv) {
             break;
         }
     }
-    printf("%ld\n", offset);
+    printf("%d\n", current_encoding);
+    int any;
+    scanf("%d", &any);
     fseek(in, offset, SEEK_SET);
     put_BOM(out, resulting_encoding);
     while (ftell(in) < file_size) {

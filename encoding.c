@@ -1,11 +1,11 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#define UTF8BOM 0x00EFBBBF
-#define UTF16LE 0x0000FFFE
-#define UTF16BE 0x0000FEFF
-#define UTF32LE 0x0000FEFF
-#define UTF32BE 0xFFFE0000
+#define UTF8BOM 0xEFBBBF
+#define UTF16LE 0xFFFE
+#define UTF16BE 0xFEFF
+#define UTF32BE 0x0000FEFF
+#define UTF32LE 0xFFFE0000
 
 // TODO: create error functions
 
@@ -27,22 +27,48 @@ int get_UTF_type(char * file_in) {
         printf("ERROR: Could not open the input file");
         return 1;
     }
-    unsigned int BOM;
-    fread(&BOM, sizeof(int), 1, file);
-    fclose(file);
-    BOM = endian_switch32(BOM);
-    switch(BOM) {
-        case UTF32LE: return 4;
-        case UTF32BE: return 5;
-        default: BOM >>= 8;
-    }
-    if (BOM == UTF8BOM)
-        return 1;
-    BOM >>= 8;
-    switch (BOM) {
-        case UTF16LE: return 2;
-        case UTF16BE: return 3;
-        default: return 0;
+    unsigned short dword;
+    fread(&dword, 1, 2, file);
+    dword = endian_switch16(dword);
+    switch(dword) {
+        case 0xFFFE: {
+            fread(&dword, 1, 2, file);
+            fclose(file);
+            dword = endian_switch16(dword);
+            if (dword == 0) {
+                return 4;
+            } else {
+                return 2;
+            }
+        }
+        case 0xFEFF: {
+            fclose(file);
+            return 3;
+        }
+        case 0x0000: {
+            fread(&dword, 1, 2, file);
+            fclose(file);
+            dword = endian_switch16(dword);
+            if (dword == 0xFEFF) {
+                return 5;
+            } else {
+                return 0;
+            }
+        }
+        case 0xEFBB: {
+            dword = 0;
+            fread(&dword, 1, 1, file);
+            fclose(file);
+            if (dword == 0xBF) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+        default: {
+            fclose(file);
+            return 0;
+        }
     }
 }
 
@@ -69,7 +95,7 @@ char * file_copy(char * file_in) {
 
 
 unsigned int get_symbol8(FILE * file) {
-    unsigned int result, byte1, byte2, byte3, byte4;
+    unsigned int result = 0, byte1 = 0, byte2 = 0, byte3 = 0, byte4 = 0;
     byte1 = fgetc(file);
     if ((byte1 >> 7) == 0b0) {
         result = byte1;
@@ -120,16 +146,19 @@ unsigned int get_symbol16BE(FILE * file) {
     return 0;
 }
 unsigned int get_symbol32LE(FILE * file) {
-    return 0;
-    // TODO: write function
+    unsigned int code = 0;
+    fread(&code, 4, 1, file);
+    return code;
 }
 unsigned int get_symbol32BE(FILE * file) {
-    return 0;
-    // TODO: write function
+    unsigned int code = 0;
+    fread(&code, 4, 1, file);
+    code = endian_switch32(code);
+    return code;
 }
 
 void put_BOM(FILE * file, int type) {
-    unsigned int BOM;
+    unsigned int BOM = 0;
     switch(type) {
         case 1: {
             BOM = endian_switch32(UTF8BOM);
@@ -155,7 +184,7 @@ void put_BOM(FILE * file, int type) {
             break;
         }
         case 5: {
-            BOM = endian_switch32(UTF16BE);
+            BOM = endian_switch32(UTF32BE);
             fwrite(&BOM, 1, 4, file);
             break;
         }
@@ -194,14 +223,56 @@ void put_symbol16BE(FILE * file, unsigned int code) {
         fwrite(&dword1, 2, 1, file);
     }
 }
+
 void put_symbol32LE(FILE * file, unsigned int code) {
-    // TODO: write function
+    fwrite(&code, 4, 1, file);
 }
+
 void put_symbol32BE(FILE * file, unsigned int code) {
-    // TODO: write function
+    code = endian_switch32(code);
+    fwrite(&code, 4, 1, file);
 }
+
 void put_symbol8(FILE * file, unsigned int code) {
-    // TODO: write function
+    unsigned int seq = 0;
+    if (code < 0x7F) {
+        fwrite(&code, 1, 1, file);
+        return;
+    } else if (code < 0x7FF) {
+        seq = 0xC080;
+        seq |= (code % 0x40);
+        code >>= 6;
+        seq |= (code << 8);
+        seq = endian_switch32(seq);
+        seq >>= 16;
+        fwrite(&seq, 1, 2, file);
+        return;
+    } else if (code < 0xFFFF) {
+        seq = 0xE08080;
+        seq |= (code % 0x40);
+        code >>= 6;
+        seq |= (code % 0x40) << 8;
+        code >>= 6;
+        seq |= code << 16;
+        seq = endian_switch32(seq);
+        seq >>= 8;
+        fwrite(&seq, 1, 3, file);
+        return;
+    } else if (code < 0x10FFFF) {
+        seq = 0xF0808080;
+        seq |= (code % 0x40);
+        code >>= 6;
+        seq |= (code % 0x40) << 8;
+        code >>= 6;
+        seq |= (code % 0x40) << 16;
+        code >>= 6;
+        seq |= code << 24;
+        seq = endian_switch32(seq);
+        fwrite(&seq, 1, 4, file);
+        return;
+    } else {
+        return;
+    }
 }
 
 
