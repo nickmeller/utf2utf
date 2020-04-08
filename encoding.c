@@ -128,12 +128,46 @@ unsigned int get_symbol8(FILE * file) {
 }
 
 unsigned int get_symbol16LE(FILE * file) {
-    // TODO: write function, reading 16LE
-    return 0;
+    unsigned int result = 0;
+    unsigned short word1 = 0, word2 = 0;
+    if (!fread(&word1, 1, 2, file)) terminate_error_reading();
+    if (word1 < 0xD800 || word1 > 0xDFFF) {
+        result = word1;
+        return result;
+    } else if (word1 >= 0xDC00) {
+        return result;
+    } else {
+        result = (word1 & 0x3ff) << 10;
+        if (!fread(&word2, 1, 2, file)) terminate_error_reading();
+        if (word2 < 0xDC00 || word2 > 0xDFFF) {
+            return 0;
+        }
+        result |= (word2 & 0x3FF);
+        result += 0x10000;
+        return result;
+    }
 }
 unsigned int get_symbol16BE(FILE * file) {
-    // TODO: write function
-    return 0;
+    unsigned int result = 0;
+    unsigned short word1 = 0, word2 = 0;
+    if (!fread(&word1, 1, 2, file)) terminate_error_reading();
+    word1 = endian_switch16(word1);
+    if (word1 < 0xD800 || word1 > 0xDFFF) {
+        result = word1;
+        return result;
+    } else if (word1 < 0xDC00) {
+        return 0;
+    } else {
+        if (!fread(&word2, 1, 2, file)) terminate_error_reading();
+        word2 = endian_switch16(word2);
+        if (word2 >= 0xDC00 && word2 <= 0xDFFF) {
+            return 0;
+        }
+        result = (word2 & 0x3ff) << 10;
+        result |= (word1 & 0x3FF);
+        result += 0x10000;
+        return result;
+    }
 }
 unsigned int get_symbol32LE(FILE * file) {
     unsigned int code = 0;

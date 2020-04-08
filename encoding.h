@@ -1,8 +1,6 @@
 #ifndef UTF2UTF_ENCODING_H
 #define UTF2UTF_ENCODING_H
 
-// TODO: add error functions in header
-
 void terminate_error_reading();
 void terminate_error_writing();
 void terminate_error_opening();
