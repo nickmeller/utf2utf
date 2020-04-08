@@ -7,7 +7,22 @@
 #define UTF32BE 0x0000FEFF
 #define UTF32LE 0xFFFE0000
 
-// TODO: create error functions
+void terminate_error_reading() {
+    printf("ERROR: Could not read a file\n");
+    exit(EXIT_FAILURE);
+}
+void terminate_error_writing() {
+    printf("ERROR: Could not write to a file\n");
+    exit(EXIT_FAILURE);
+}
+void terminate_error_opening() {
+    printf("ERROR: Could not open file\n");
+    exit(EXIT_FAILURE);
+}
+void terminate_error_allocationg_memory() {
+    printf("ERROR: Could not allocate memory\n");
+    exit(EXIT_FAILURE);
+}
 
 
 unsigned short endian_switch16(unsigned short num) {
@@ -23,16 +38,13 @@ unsigned int endian_switch32(unsigned int num) {
 
 int get_UTF_type(char * file_in) {
     FILE * file = fopen(file_in, "r");
-    if (file == NULL) {
-        printf("ERROR: Could not open the input file");
-        return 1;
-    }
+    if (file == NULL) terminate_error_opening();
     unsigned short dword;
-    fread(&dword, 1, 2, file);
+    if (!fread(&dword, 1, 2, file)) terminate_error_reading();
     dword = endian_switch16(dword);
     switch(dword) {
         case 0xFFFE: {
-            fread(&dword, 1, 2, file);
+            if (!fread(&dword, 1, 2, file)) terminate_error_reading();
             fclose(file);
             dword = endian_switch16(dword);
             if (dword == 0) {
@@ -46,7 +58,7 @@ int get_UTF_type(char * file_in) {
             return 3;
         }
         case 0x0000: {
-            fread(&dword, 1, 2, file);
+            if (!fread(&dword, 1, 2, file)) terminate_error_reading();
             fclose(file);
             dword = endian_switch16(dword);
             if (dword == 0xFEFF) {
@@ -57,7 +69,7 @@ int get_UTF_type(char * file_in) {
         }
         case 0xEFBB: {
             dword = 0;
-            fread(&dword, 1, 1, file);
+            if (!fread(&dword, 1, 1, file)) terminate_error_reading();
             fclose(file);
             if (dword == 0xBF) {
                 return 1;
@@ -71,28 +83,6 @@ int get_UTF_type(char * file_in) {
         }
     }
 }
-
-char * file_copy(char * file_in) {
-    FILE * file = fopen(file_in, "rb");
-    if (file == NULL) {
-        printf("ERROR: could not open file\n");
-        return NULL;
-    }
-    FILE * copy = fopen("__cpy", "w");
-    if (copy == NULL) {
-        printf("ERROR: Unable to create temperate files\n");
-        return NULL;
-    }
-    short ch;
-    while((ch = fgetc(file)) != EOF)
-    {
-        fputc(ch, copy);
-    }
-    fclose(file);
-    fclose(copy);
-    return "__cpy";
-}
-
 
 unsigned int get_symbol8(FILE * file) {
     unsigned int result = 0, byte1 = 0, byte2 = 0, byte3 = 0, byte4 = 0;
@@ -147,12 +137,12 @@ unsigned int get_symbol16BE(FILE * file) {
 }
 unsigned int get_symbol32LE(FILE * file) {
     unsigned int code = 0;
-    fread(&code, 4, 1, file);
+    if (!fread(&code, 4, 1, file)) terminate_error_reading();
     return code;
 }
 unsigned int get_symbol32BE(FILE * file) {
     unsigned int code = 0;
-    fread(&code, 4, 1, file);
+    if (!fread(&code, 4, 1, file)) terminate_error_reading();
     code = endian_switch32(code);
     return code;
 }
@@ -163,29 +153,29 @@ void put_BOM(FILE * file, int type) {
         case 1: {
             BOM = endian_switch32(UTF8BOM);
             BOM >>= 8;
-            fwrite(&BOM, 1, 3, file);
+            if (!fwrite(&BOM, 1, 3, file)) terminate_error_writing();
             break;
         }
         case 2: {
             BOM = endian_switch32(UTF16LE);
             BOM >>= 16;
-            fwrite(&BOM, 1, 2, file);
+            if (!fwrite(&BOM, 1, 2, file)) terminate_error_writing();
             break;
         }
         case 3: {
             BOM = endian_switch32(UTF16BE);
             BOM >>= 16;
-            fwrite(&BOM, 1, 2, file);
+            if (!fwrite(&BOM, 1, 2, file)) terminate_error_writing();
             break;
         }
         case 4: {
             BOM = endian_switch32(UTF32LE);
-            fwrite(&BOM, 1, 4, file);
+            if (!fwrite(&BOM, 1, 4, file)) terminate_error_writing();
             break;
         }
         case 5: {
             BOM = endian_switch32(UTF32BE);
-            fwrite(&BOM, 1, 4, file);
+            if(!fwrite(&BOM, 1, 4, file)) terminate_error_writing();
             break;
         }
         default: {
@@ -204,15 +194,15 @@ void put_symbol16LE(FILE * file, unsigned int code) {
         unsigned char high_10 = (unsigned char) (code >> 10);
         unsigned short dword1 = (unsigned short) (0xD800 | high_10);
         unsigned short dword2 = (unsigned short) (0xDC00 | low_10);
-        fwrite(&dword1, 2, 1, file);
-        fwrite(&dword2, 2, 1, file);
+        if (!fwrite(&dword1, 2, 1, file)) terminate_error_writing();
+        if (!fwrite(&dword2, 2, 1, file)) terminate_error_writing();
     }
 }
 
 void put_symbol16BE(FILE * file, unsigned int code) {
     if (code < 0x10000) {
         unsigned short dword = endian_switch16(code);
-        fwrite(&dword, 2, 1, file);
+        if(!fwrite(&dword, 2, 1, file)) terminate_error_writing();
     } else {
         code-= 0x10000;
         unsigned char low_10 = (unsigned char) (code & 0x3FF);
@@ -230,13 +220,13 @@ void put_symbol32LE(FILE * file, unsigned int code) {
 
 void put_symbol32BE(FILE * file, unsigned int code) {
     code = endian_switch32(code);
-    fwrite(&code, 4, 1, file);
+    if (!fwrite(&code, 4, 1, file)) terminate_error_writing();
 }
 
 void put_symbol8(FILE * file, unsigned int code) {
     unsigned int seq = 0;
     if (code < 0x7F) {
-        fwrite(&code, 1, 1, file);
+        if (!fwrite(&code, 1, 1, file)) terminate_error_writing();
         return;
     } else if (code < 0x7FF) {
         seq = 0xC080;
@@ -245,7 +235,7 @@ void put_symbol8(FILE * file, unsigned int code) {
         seq |= (code << 8);
         seq = endian_switch32(seq);
         seq >>= 16;
-        fwrite(&seq, 1, 2, file);
+        if(!fwrite(&seq, 1, 2, file)) terminate_error_writing();
         return;
     } else if (code < 0xFFFF) {
         seq = 0xE08080;
@@ -256,7 +246,7 @@ void put_symbol8(FILE * file, unsigned int code) {
         seq |= code << 16;
         seq = endian_switch32(seq);
         seq >>= 8;
-        fwrite(&seq, 1, 3, file);
+        if(!fwrite(&seq, 1, 3, file)) terminate_error_writing();
         return;
     } else if (code < 0x10FFFF) {
         seq = 0xF0808080;
@@ -268,7 +258,7 @@ void put_symbol8(FILE * file, unsigned int code) {
         code >>= 6;
         seq |= code << 24;
         seq = endian_switch32(seq);
-        fwrite(&seq, 1, 4, file);
+        if(!fwrite(&seq, 1, 4, file)) terminate_error_writing();
         return;
     } else {
         return;

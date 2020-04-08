@@ -9,23 +9,18 @@ int main(int argc, char ** argv) {
         return 1;
     }
     char * file_in = malloc(sizeof(char) * (strlen(argv[1]) + 1));
+    if (file_in == NULL) terminate_error_allocationg_memory();
     strcpy(file_in, argv[1]);
     char * file_out = malloc(sizeof(char) * (strlen(argv[2]) + 1));
+    if (file_out == NULL) terminate_error_allocationg_memory();
     strcpy(file_out, argv[2]);
     int resulting_encoding = atoi(argv[3]);
     int current_encoding = get_UTF_type(file_in);
 
     FILE * in = fopen(file_in, "r");
-    if (in == NULL) {
-        printf("ERROR: Could not open file %s", file_in);
-        exit(EXIT_FAILURE);
-    }
     FILE * out = fopen(file_out, "w");
-    if (out == NULL) {
-        printf("ERROR: Could not open file %s", file_out);
-        exit(EXIT_FAILURE);
-    }
-    fseek(in, 0, SEEK_END);
+    if (out == NULL || in == NULL) terminate_error_opening();
+    if(fseek(in, 0, SEEK_END)) terminate_error_reading();
     size_t file_size = ftell(in);
     long offset = 0;
     switch(current_encoding) {
@@ -47,10 +42,8 @@ int main(int argc, char ** argv) {
             break;
         }
     }
-    printf("%d\n", current_encoding);
-    int any;
-    scanf("%d", &any);
-    fseek(in, offset, SEEK_SET);
+
+    if(fseek(in, offset, SEEK_SET)) terminate_error_reading();
     put_BOM(out, resulting_encoding);
     while (ftell(in) < file_size) {
         unsigned int code = 0;

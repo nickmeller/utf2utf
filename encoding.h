@@ -3,6 +3,11 @@
 
 // TODO: add error functions in header
 
+void terminate_error_reading();
+void terminate_error_writing();
+void terminate_error_opening();
+void terminate_error_allocationg_memory();
+
 unsigned short endian_switch16(unsigned short num);
 unsigned int endian_switch32(unsigned int num);
 int get_UTF_type(char * file_in);
